@@ -165,7 +165,7 @@ if(isset($_POST['codigo'])){
 </head>
 <body>
     <div class="contenido">
-        <h2>Habitación 6 - GP Histórico</h2>
+        <h2>Habitación 6</h2>
         <img src="gp-historico.jpg" alt="GP Histórico">
         <p>
             <strong>Pista 1 → Dígito 1:</strong> Número de campeonatos de Max Verstappen.<br><br>

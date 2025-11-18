@@ -96,7 +96,7 @@ if(isset($_POST['codigo'])){
 </head>
 <body>
     <div class="contenido">
-        <h2>Habitación 4 - Historia</h2>
+        <h2>Habitación 4</h2>
         <img src="alonso.jpg" alt="Alonso con Minardi">
         <p>
             <strong>Pista 1 → Dígito 1:</strong> Número de cilindros del motor híbrido actual de F1.<br><br>

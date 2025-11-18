@@ -105,7 +105,7 @@ if(isset($_POST['codigo'])){
 </head>
 <body>
     <div class="contenido">
-        <h2>Habitación 5 - Circuitos Legendarios</h2>
+        <h2>Habitación 5</h2>
         <img src="audi.jpeg" alt="Spa-Francorchamps">
         <p>
             <strong>Pista 1 → Dígito 1:</strong> Resta al número de curvas de Mónaco, el número de curvas de Monza.<br>

@@ -2,7 +2,7 @@
 session_start();
 $mensaje = "";
 if(isset($_POST['codigo'])){
-    if($_POST['codigo']=="404"){ 
+    if($_POST['codigo']=="824"){ 
         header("Location: room4.php"); 
         exit; 
     } else {
@@ -96,11 +96,11 @@ if(isset($_POST['codigo'])){
 </head>
 <body>
     <div class="contenido">
-        <h2>Habitación 3 - Títulos</h2>
+        <h2>Habitación 3</h2>
         <img src="Pitstop.jpg" alt="Vettel">
         <p>
-            <strong>Pista 1 → Dígito 1:</strong> Velocidad máxima permitida en el pit lane en km/h dividido entre 10.<br><br>
-            <!-- Puedes añadir más pistas si quieres que esta habitación tenga más de un dígito -->
+            <strong>Pista 1 → Dígito 1:</strong> Velocidad máxima permitida en el pit lane en km/h dividido entre 10.<br>
+            <strong>Pista 2 → Dígitos 2 y 3:</strong> Número de GP's por temporada actualmente.<br>
         </p>
         <form method="POST">
             <input name="codigo" placeholder="Introduce el código"/>
