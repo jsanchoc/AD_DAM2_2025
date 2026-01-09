@@ -1,7 +1,6 @@
 <?php
 include 'db.php';
 
-// Consultas
 $total_games = $pdo->query("SELECT COUNT(*) FROM GAMES")->fetchColumn();
 $total_players = $pdo->query("SELECT COUNT(*) FROM PLAYERS")->fetchColumn();
 $total_partidas = $pdo->query("SELECT COUNT(*) FROM PARTIDAS")->fetchColumn();
