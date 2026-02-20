@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Golf-Maniac: Puzzle Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        background: #1a1a1a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        color: white;
+        font-family: "Segoe UI", sans-serif;
+        overflow: hidden;
+      }
+      #interfaz {
+        position: absolute;
+        top: 10px;
+        width: 100%;
+        text-align: center;
+        pointer-events: none;
+        z-index: 10;
+      }
+      .stats {
+        background: rgba(0, 0, 0, 0.8);
+        padding: 10px 25px;
+        border-radius: 10px;
+        border: 2px solid #a3d900;
+        display: inline-block;
+        font-size: 20px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="interfaz">
+      <div class="stats">
+        NIVEL: <span id="lvl">1</span> | GOLPES: <span id="contador">0</span>
+      </div>
+    </div>
+    <script>
+      // --- CONFIGURACIÓN DE NIVELES ---
+      const niveles = [
+        // Nivel 1: Básico
+        {
+          bola: { x: 100, y: 300 },
+          hoyo: { x: 700, y: 300 },
+          muros: [{ x: 400, y: 300, w: 40, h: 250 }],
+        },
+        // Nivel 2: Laberinto
+        // Nivel 2: Laberinto (Muros ajustados para evitar bugs en los bordes)
+        {
+          bola: { x: 100, y: 100 },
+          hoyo: { x: 100, y: 500 },
+          muros: [
+            { x: 300, y: 200, w: 700, h: 40 }, // Toca pared izquierda sin fisuras
+            { x: 500, y: 400, w: 700, h: 40 }, // Toca pared derecha sin fisuras
+          ],
+        },
+        // Nivel 3: Trampa de Arena (frena la bola)
+        {
+          bola: { x: 100, y: 300 },
+          hoyo: { x: 700, y: 300 },
+          muros: [
+            { x: 400, y: 100, w: 800, h: 40 }, // Muro que sella arriba
+            { x: 400, y: 500, w: 800, h: 40 }, // Muro que sella abajo
+          ],
+          arena: [{ x: 400, y: 300, w: 300, h: 360 }],
+        },
+        // Nivel 4: Rebotadores (Bumpers) y Agua (penaliza)
+        {
+          bola: { x: 100, y: 300 },
+          hoyo: { x: 700, y: 300 },
+          agua: [
+            { x: 400, y: 100, w: 200, h: 200 },
+            { x: 400, y: 500, w: 200, h: 200 },
+          ],
+          bumpers: [
+            { x: 550, y: 200 },
+            { x: 550, y: 400 },
+          ],
+          muros: [{ x: 400, y: 300, w: 200, h: 40 }], // Muro central para molestar
+        },
+      ];
+
+      const config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        physics: {
+          default: "matter",
+          matter: { gravity: { y: 0 }, debug: false },
+        },
+        scene: { create: create },
+      };
+
+      const juego = new Phaser.Game(config);
+
+      let escena,
+        bola,
+        guia,
+        activo = false,
+        golpes = 0,
+        nivelActual = 0;
+      let grupoObjetos = [],
+        nivelCompletado = false;
+
+      function create() {
+        escena = this;
+        escena.cameras.main.setBackgroundColor("#2d572c");
+
+        // Bordes físicos ultra gruesos (50px) para evitar salidas de pantalla
+        escena.matter.world.setBounds(
+          0,
+          0,
+          800,
+          600,
+          50,
+          true,
+          true,
+          true,
+          true,
+        );
+
+        // --- GENERAR GRÁFICOS INTERNOS ---
+        let g = escena.make.graphics({ x: 0, y: 0, add: false });
+        g.fillStyle(0xffffff)
+          .fillCircle(10, 10, 10)
+          .generateTexture("t_bola", 20, 20);
+        g.clear();
+        g.fillStyle(0x000000)
+          .fillCircle(15, 15, 15)
+          .generateTexture("t_hoyo", 30, 30);
+        g.clear();
+        g.fillStyle(0x888888)
+          .fillRect(0, 0, 32, 32)
+          .generateTexture("t_muro", 32, 32);
+        g.clear();
+        g.fillStyle(0xd4b857, 0.6)
+          .fillRect(0, 0, 32, 32)
+          .generateTexture("t_arena", 32, 32);
+        g.clear();
+        g.fillStyle(0x3498db, 0.7)
+          .fillRect(0, 0, 32, 32)
+          .generateTexture("t_agua", 32, 32);
+        g.clear();
+        g.fillStyle(0xff0044)
+          .fillCircle(15, 15, 15)
+          .generateTexture("t_bumper", 30, 30);
+        g.clear();
+
+        guia = escena.add.graphics();
+
+        // --- EVENTOS DEL RATÓN ---
+        escena.input.on("pointerdown", () => {
+          if (bola && bola.body.speed < 0.2) activo = true;
+        });
+
+        escena.input.on("pointermove", (p) => {
+          if (activo) {
+            guia.clear().lineStyle(4, 0xffffff, 0.6);
+            guia.lineBetween(bola.x, bola.y, p.x, p.y);
+          }
+        });
+
+        escena.input.on("pointerup", (p) => {
+          if (activo) {
+            activo = false;
+            guia.clear();
+            const angulo = Phaser.Math.Angle.Between(p.x, p.y, bola.x, bola.y);
+            let dist = Phaser.Math.Distance.Between(p.x, p.y, bola.x, bola.y);
+
+            // LÍMITE DE POTENCIA
+            dist = Math.min(dist, 120);
+
+            const fuerza = dist * 0.0007;
+            bola.applyForce({
+              x: Math.cos(angulo) * fuerza,
+              y: Math.sin(angulo) * fuerza,
+            });
+            golpes++;
+            actualizarUI();
+          }
+        });
+
+        // --- LÓGICA DE COLISIONES ---
+        escena.matter.world.on("collisionstart", (e) => {
+          e.pairs.forEach((p) => {
+            let A = p.bodyA.gameObject,
+              B = p.bodyB.gameObject;
+            if (!A || !B) return;
+
+            let b = null,
+              obj = null;
+            // Identificar cuál es la bola y cuál es el otro objeto
+            if (A.getData("tipo") === "bola") {
+              b = A;
+              obj = B;
+            } else if (B.getData("tipo") === "bola") {
+              b = B;
+              obj = A;
+            }
+
+            if (b && obj) {
+              let tipo = obj.getData("tipo");
+              if (tipo === "hoyo" && !nivelCompletado) {
+                nivelCompletado = true;
+                setTimeout(() => siguienteNivel(), 100);
+              } else if (tipo === "agua") {
+                // Penalización por caer al agua
+                b.setPosition(b.getData("origenX"), b.getData("origenY"));
+                b.setVelocity(0, 0);
+                golpes++;
+                actualizarUI();
+              } else if (tipo === "arena") {
+                b.setFrictionAir(0.12); // Fricción alta (frena rápido)
+              }
+            }
+          });
+        });
+
+        escena.matter.world.on("collisionend", (e) => {
+          e.pairs.forEach((p) => {
+            let A = p.bodyA.gameObject,
+              B = p.bodyB.gameObject;
+            if (!A || !B) return;
+            let b =
+              A.getData("tipo") === "bola"
+                ? A
+                : B.getData("tipo") === "bola"
+                  ? B
+                  : null;
+            let obj = b === A ? B : A;
+            if (b && obj && obj.getData("tipo") === "arena") {
+              b.setFrictionAir(0.02); // Restaura velocidad normal al salir de la arena
+            }
+          });
+        });
+
+        cargarNivel();
+      }
+
+      function cargarNivel() {
+        nivelCompletado = false;
+        const d = niveles[nivelActual];
+        actualizarUI();
+
+        // Limpieza visual y física de la escena
+        if (bola) bola.destroy();
+        grupoObjetos.forEach((o) => o.destroy());
+        grupoObjetos = [];
+
+        // Hoyo
+        let h = escena.matter.add.image(d.hoyo.x, d.hoyo.y, "t_hoyo", null, {
+          isStatic: true,
+          isSensor: true,
+        });
+        h.setData("tipo", "hoyo");
+        grupoObjetos.push(h);
+
+        // Muros
+        if (d.muros)
+          d.muros.forEach((m) => {
+            let muro = escena.add.tileSprite(m.x, m.y, m.w, m.h, "t_muro");
+            escena.matter.add.gameObject(muro, { isStatic: true });
+            grupoObjetos.push(muro);
+          });
+
+        // Arena (Sensor)
+        if (d.arena)
+          d.arena.forEach((a) => {
+            let arena = escena.add.tileSprite(a.x, a.y, a.w, a.h, "t_arena");
+            escena.matter.add.gameObject(arena, {
+              isStatic: true,
+              isSensor: true,
+            });
+            arena.setData("tipo", "arena");
+            grupoObjetos.push(arena);
+          });
+
+        // Agua (Sensor)
+        if (d.agua)
+          d.agua.forEach((a) => {
+            let agua = escena.add.tileSprite(a.x, a.y, a.w, a.h, "t_agua");
+            escena.matter.add.gameObject(agua, {
+              isStatic: true,
+              isSensor: true,
+            });
+            agua.setData("tipo", "agua");
+            grupoObjetos.push(agua);
+          });
+
+        // Bumpers
+        if (d.bumpers)
+          d.bumpers.forEach((b) => {
+            let bumper = escena.matter.add.image(b.x, b.y, "t_bumper", null, {
+              isStatic: true,
+            });
+            bumper.setCircle(15);
+            bumper.setBounce(1.5); // Rebote súper fuerte
+            grupoObjetos.push(bumper);
+          });
+
+        // Bola
+        bola = escena.matter.add.image(d.bola.x, d.bola.y, "t_bola");
+        bola.setCircle(10);
+        bola.setFrictionAir(0.02);
+        bola.setBounce(0.8);
+        bola.setData("tipo", "bola");
+        bola.setData("origenX", d.bola.x);
+        bola.setData("origenY", d.bola.y);
+      }
+
+      function siguienteNivel() {
+        nivelActual++;
+        if (nivelActual < niveles.length) {
+          alert("¡Nivel superado!");
+          cargarNivel();
+        } else {
+          alert("¡HAS COMPLETADO LOS 4 NIVELES!\nGolpes totales: " + golpes);
+          location.reload();
+        }
+      }
+
+      function actualizarUI() {
+        document.getElementById("lvl").innerText = nivelActual + 1;
+        document.getElementById("contador").innerText = golpes;
+      }
+    </script>
+  </body>
+</html>
