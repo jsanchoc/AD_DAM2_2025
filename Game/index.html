@@ -26,11 +26,11 @@
       }
       .stats {
         background: rgba(0, 0, 0, 0.8);
-        padding: 10px 25px;
+        padding: 10px 20px;
         border-radius: 10px;
         border: 2px solid #a3d900;
         display: inline-block;
-        font-size: 20px;
+        font-size: 18px;
         font-weight: bold;
       }
     </style>
@@ -38,58 +38,60 @@
   <body>
     <div id="interfaz">
       <div class="stats">
-        NIVEL: <span id="lvl">1</span> | GOLPES: <span id="contador">0</span>
+        NIVEL <span id="lvl">1</span> (Par <span id="par">3</span>) | GOLPES:
+        <span id="contador">0</span> | PUNTOS: <span id="puntos">0</span>
       </div>
     </div>
     <script>
-      // --- CONFIGURACIÓN DE NIVELES ---
+      // --- CONFIGURACIÓN DE NIVELES (Formato Vertical 600x800) ---
       const niveles = [
         // Nivel 1: Básico
         {
-          bola: { x: 100, y: 300 },
-          hoyo: { x: 700, y: 300 },
-          muros: [{ x: 400, y: 300, w: 40, h: 250 }],
+          par: 2,
+          bola: { x: 300, y: 700 },
+          hoyo: { x: 300, y: 100 },
+          muros: [{ x: 300, y: 400, w: 300, h: 40 }],
         },
-        // Nivel 2: Laberinto
-        // Nivel 2: Laberinto (Muros ajustados para evitar bugs en los bordes)
+        // Nivel 2: Laberinto Zig-Zag
         {
-          bola: { x: 100, y: 100 },
-          hoyo: { x: 100, y: 500 },
+          par: 3,
+          bola: { x: 100, y: 700 },
+          hoyo: { x: 500, y: 100 },
           muros: [
-            { x: 300, y: 200, w: 700, h: 40 }, // Toca pared izquierda sin fisuras
-            { x: 500, y: 400, w: 700, h: 40 }, // Toca pared derecha sin fisuras
+            { x: 200, y: 500, w: 400, h: 40 }, // Muro desde la izquierda
+            { x: 400, y: 300, w: 400, h: 40 }, // Muro desde la derecha
           ],
         },
-        // Nivel 3: Trampa de Arena (frena la bola)
+        // Nivel 3: Trampa de Arena
         {
-          bola: { x: 100, y: 300 },
-          hoyo: { x: 700, y: 300 },
-          muros: [
-            { x: 400, y: 100, w: 800, h: 40 }, // Muro que sella arriba
-            { x: 400, y: 500, w: 800, h: 40 }, // Muro que sella abajo
-          ],
-          arena: [{ x: 400, y: 300, w: 300, h: 360 }],
+          par: 3,
+          bola: { x: 300, y: 700 },
+          hoyo: { x: 300, y: 100 },
+          muros: [],
+          arena: [{ x: 300, y: 400, w: 600, h: 250 }], // Ocupa todo el centro
         },
-        // Nivel 4: Rebotadores (Bumpers) y Agua (penaliza)
+        // Nivel 4: Rebotadores y Agua
         {
-          bola: { x: 100, y: 300 },
-          hoyo: { x: 700, y: 300 },
+          par: 4,
+          bola: { x: 300, y: 700 },
+          hoyo: { x: 300, y: 100 },
           agua: [
-            { x: 400, y: 100, w: 200, h: 200 },
-            { x: 400, y: 500, w: 200, h: 200 },
+            { x: 150, y: 500, w: 200, h: 200 },
+            { x: 450, y: 300, w: 200, h: 200 },
           ],
           bumpers: [
-            { x: 550, y: 200 },
-            { x: 550, y: 400 },
+            { x: 300, y: 400 },
+            { x: 150, y: 250 },
+            { x: 450, y: 550 },
           ],
-          muros: [{ x: 400, y: 300, w: 200, h: 40 }], // Muro central para molestar
+          muros: [],
         },
       ];
 
       const config = {
         type: Phaser.AUTO,
-        width: 800,
-        height: 600,
+        width: 600, // Pantalla más estrecha
+        height: 800, // Pantalla más alta
         physics: {
           default: "matter",
           matter: { gravity: { y: 0 }, debug: false },
@@ -102,8 +104,9 @@
       let escena,
         bola,
         guia,
-        activo = false,
-        golpes = 0,
+        activo = false;
+      let golpesNivel = 0,
+        puntuacionGlobal = 0,
         nivelActual = 0;
       let grupoObjetos = [],
         nivelCompletado = false;
@@ -111,19 +114,6 @@
       function create() {
         escena = this;
         escena.cameras.main.setBackgroundColor("#2d572c");
-
-        // Bordes físicos ultra gruesos (50px) para evitar salidas de pantalla
-        escena.matter.world.setBounds(
-          0,
-          0,
-          800,
-          600,
-          50,
-          true,
-          true,
-          true,
-          true,
-        );
 
         // --- GENERAR GRÁFICOS INTERNOS ---
         let g = escena.make.graphics({ x: 0, y: 0, add: false });
@@ -172,16 +162,15 @@
             guia.clear();
             const angulo = Phaser.Math.Angle.Between(p.x, p.y, bola.x, bola.y);
             let dist = Phaser.Math.Distance.Between(p.x, p.y, bola.x, bola.y);
-
-            // LÍMITE DE POTENCIA
-            dist = Math.min(dist, 120);
-
+            dist = Math.min(dist, 120); // Limitar potencia
             const fuerza = dist * 0.0007;
+
             bola.applyForce({
               x: Math.cos(angulo) * fuerza,
               y: Math.sin(angulo) * fuerza,
             });
-            golpes++;
+
+            golpesNivel++;
             actualizarUI();
           }
         });
@@ -195,7 +184,6 @@
 
             let b = null,
               obj = null;
-            // Identificar cuál es la bola y cuál es el otro objeto
             if (A.getData("tipo") === "bola") {
               b = A;
               obj = B;
@@ -208,15 +196,14 @@
               let tipo = obj.getData("tipo");
               if (tipo === "hoyo" && !nivelCompletado) {
                 nivelCompletado = true;
-                setTimeout(() => siguienteNivel(), 100);
+                procesarVictoria();
               } else if (tipo === "agua") {
-                // Penalización por caer al agua
                 b.setPosition(b.getData("origenX"), b.getData("origenY"));
                 b.setVelocity(0, 0);
-                golpes++;
+                golpesNivel++; // Penalización
                 actualizarUI();
               } else if (tipo === "arena") {
-                b.setFrictionAir(0.12); // Fricción alta (frena rápido)
+                b.setFrictionAir(0.12);
               }
             }
           });
@@ -235,7 +222,7 @@
                   : null;
             let obj = b === A ? B : A;
             if (b && obj && obj.getData("tipo") === "arena") {
-              b.setFrictionAir(0.02); // Restaura velocidad normal al salir de la arena
+              b.setFrictionAir(0.02);
             }
           });
         });
@@ -243,15 +230,32 @@
         cargarNivel();
       }
 
+      function crearParedesBorde() {
+        // Paredes que rodean toda la pantalla (Arriba, Abajo, Izquierda, Derecha)
+        const bordes = [
+          { x: 300, y: 10, w: 600, h: 20 },
+          { x: 300, y: 790, w: 600, h: 20 },
+          { x: 10, y: 400, w: 20, h: 800 },
+          { x: 590, y: 400, w: 20, h: 800 },
+        ];
+        bordes.forEach((b) => {
+          let muro = escena.add.tileSprite(b.x, b.y, b.w, b.h, "t_muro");
+          escena.matter.add.gameObject(muro, { isStatic: true });
+          grupoObjetos.push(muro);
+        });
+      }
+
       function cargarNivel() {
         nivelCompletado = false;
+        golpesNivel = 0; // Se resetean los golpes al cambiar de hoyo
         const d = niveles[nivelActual];
         actualizarUI();
 
-        // Limpieza visual y física de la escena
         if (bola) bola.destroy();
         grupoObjetos.forEach((o) => o.destroy());
         grupoObjetos = [];
+
+        crearParedesBorde();
 
         // Hoyo
         let h = escena.matter.add.image(d.hoyo.x, d.hoyo.y, "t_hoyo", null, {
@@ -269,7 +273,7 @@
             grupoObjetos.push(muro);
           });
 
-        // Arena (Sensor)
+        // Arena
         if (d.arena)
           d.arena.forEach((a) => {
             let arena = escena.add.tileSprite(a.x, a.y, a.w, a.h, "t_arena");
@@ -281,7 +285,7 @@
             grupoObjetos.push(arena);
           });
 
-        // Agua (Sensor)
+        // Agua
         if (d.agua)
           d.agua.forEach((a) => {
             let agua = escena.add.tileSprite(a.x, a.y, a.w, a.h, "t_agua");
@@ -300,7 +304,7 @@
               isStatic: true,
             });
             bumper.setCircle(15);
-            bumper.setBounce(1.5); // Rebote súper fuerte
+            bumper.setBounce(1.5);
             grupoObjetos.push(bumper);
           });
 
@@ -314,20 +318,48 @@
         bola.setData("origenY", d.bola.y);
       }
 
-      function siguienteNivel() {
-        nivelActual++;
-        if (nivelActual < niveles.length) {
-          alert("¡Nivel superado!");
-          cargarNivel();
-        } else {
-          alert("¡HAS COMPLETADO LOS 4 NIVELES!\nGolpes totales: " + golpes);
-          location.reload();
-        }
+      function procesarVictoria() {
+        const par = niveles[nivelActual].par;
+        const diferencia = golpesNivel - par;
+        puntuacionGlobal += diferencia;
+        actualizarUI();
+
+        let mensaje = "";
+        if (golpesNivel === 1) mensaje = "¡Hoyo en 1! 🤯";
+        else if (diferencia <= -2) mensaje = "¡Eagle! 🦅";
+        else if (diferencia === -1) mensaje = "¡Birdie! 🐦";
+        else if (diferencia === 0) mensaje = "¡Par! ⛳";
+        else if (diferencia === 1) mensaje = "¡Bogey! 🤨";
+        else if (diferencia >= 2) mensaje = "¡Doble Bogey! 😫";
+
+        setTimeout(() => {
+          alert(`${mensaje}\nGolpes: ${golpesNivel} (Par ${par})`);
+          nivelActual++;
+          if (nivelActual < niveles.length) {
+            cargarNivel();
+          } else {
+            let finalMsg =
+              puntuacionGlobal < 0
+                ? "¡Excelente puntuación bajo par!"
+                : "Prueba a mejorar esos golpes.";
+            alert(
+              `¡JUEGO COMPLETADO!\nPuntuación Final: ${puntuacionGlobal > 0 ? "+" + puntuacionGlobal : puntuacionGlobal}\n${finalMsg}`,
+            );
+            location.reload();
+          }
+        }, 100);
       }
 
       function actualizarUI() {
         document.getElementById("lvl").innerText = nivelActual + 1;
-        document.getElementById("contador").innerText = golpes;
+        document.getElementById("par").innerText = niveles[nivelActual]
+          ? niveles[nivelActual].par
+          : 0;
+        document.getElementById("contador").innerText = golpesNivel;
+        // Poner el símbolo + si es positivo, para que parezca de golf de verdad
+        let puntosTexto =
+          puntuacionGlobal > 0 ? "+" + puntuacionGlobal : puntuacionGlobal;
+        document.getElementById("puntos").innerText = puntosTexto;
       }
     </script>
   </body>
