@@ -36,14 +36,13 @@ function create() {
   createWall(this, 10, 300, 20, 600);
   createWall(this, 790, 300, 20, 600);
 
-  createWall(this, 120, 150, 20, 300);
-  createWall(this, 250, 300, 250, 20);
-  createWall(this, 400, 200, 20, 200);
-  createWall(this, 550, 400, 350, 20);
-  createWall(this, 300, 500, 20, 200);
+  createWall(this, 120, 150, 20, 600);
+
+  createWall(this, 550, 400, 250, 20);
+  createWall(this, 300, 500, 20, 600);
   createWall(this, 650, 150, 300, 20);
-  createWall(this, 700, 300, 20, 100);
-  createWall(this, 600, 500, 20, 100);
+  createWall(this, 600, 200, 20, 80);
+  createWall(this, 600, 550, 20, 80);
 
   player = this.physics.add.sprite(50, 50, "block").setDisplaySize(16, 16);
   player.setTint(0x0000ff);
